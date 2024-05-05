@@ -16,6 +16,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
   let store = Store(
     initialState: AppReducer.State()
   ) {
+    // transformDependency: 依存関係の設定を行なっている
+    // \.self指定で全ての依存関係の設定を合わせて行える
     AppReducer().transformDependency(\.self) {
       $0.audioPlayer = .liveValue
       $0.database = .live(
@@ -54,7 +56,9 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
 @main
 struct IsowordsApp: App {
+  // SwiftUIでAppDelegateを使用するために宣言
   @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+  // 値はactive、inactive、background
   @Environment(\.scenePhase) private var scenePhase
 
   init() {

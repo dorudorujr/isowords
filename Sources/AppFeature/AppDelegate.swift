@@ -30,6 +30,7 @@ public struct AppDelegateReducer {
   public var body: some ReducerOf<Self> {
     Reduce { state, action in
       switch action {
+      // アプリ起動時(起動プロセスがほぼ完了し、アプリを実行する準備がほぼ整っていることをデリゲートに伝えます。)
       case .didFinishLaunching:
         let userNotificationsEventStream = self.userNotifications.delegate()
         return .run { send in
@@ -79,6 +80,7 @@ public struct AppDelegateReducer {
       case .didRegisterForRemoteNotifications(.failure):
         return .none
 
+      // Push通知サービス(APN)に正常に登録された
       case let .didRegisterForRemoteNotifications(.success(tokenData)):
         let token = tokenData.map { String(format: "%02.2hhx", $0) }.joined()
         return .run { _ in

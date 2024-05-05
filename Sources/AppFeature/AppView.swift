@@ -12,7 +12,9 @@ import SwiftUI
 
 @Reducer
 public struct AppReducer {
+  // Swiftのバグ？で準拠できないのでこの対応
   @Reducer(state: .equatable)
+  // 遷移を管理
   public enum Destination {
     case game(Game)
     case onboarding(Onboarding)
@@ -21,6 +23,10 @@ public struct AppReducer {
   @ObservableState
   public struct State: Equatable {
     public var appDelegate: AppDelegateReducer.State
+    // @Presents: ifLetと組み合わせて使用する。
+    // nil値は機能が提示されていないことを表し(表示されていない)、non-nil値は提示されていることを表す。
+    // 子Reducerとの結合
+    // case destination(PresentationAction<Destination.Action>)とセット？
     @Presents public var destination: Destination.State?
     public var home: Home.State
 
@@ -61,10 +67,14 @@ public struct AppReducer {
   public var body: some ReducerOf<Self> {
     self.core
       .onChange(of: \.destination?.game?.moves) { _, moves in
+        // .onChange: 指定した値が変更されたときにReduceが実行される
         Reduce { state, _ in
           guard let game = state.destination?.game, game.isSavable
           else { return .none }
 
+          // gameContext: dailyChallenge、solo、shared、turnBased(これ謎)
+          // gameMode: timed、unlimited
+          // 仕様としてtimedはアプリキルしても保持されない
           switch (game.gameContext, game.gameMode) {
           case (.dailyChallenge, .unlimited):
             state.home.savedGames.dailyChallengeUnlimited = InProgressGame(gameState: game)
@@ -77,6 +87,7 @@ public struct AppReducer {
         }
       }
       .onChange(of: \.home.savedGames) { _, savedGames in
+        // 多分.onChange(of: \.destination?.game?.moves)の変更でゲームを保存
         Reduce { _, action in
           if case .savedGamesLoaded(.success) = action { return .none }
           return .run { _ in
@@ -99,6 +110,7 @@ public struct AppReducer {
     }
     Reduce { state, action in
       switch action {
+      // アプリ起動時(起動プロセスがほぼ完了し、アプリを実行する準備がほぼ整っていることをデリゲートに伝えます。)
       case .appDelegate(.didFinishLaunching):
         if !self.userDefaults.hasShownFirstLaunchOnboarding {
           state.destination = .onboarding(Onboarding.State(presentationStyle: .firstLaunch))
@@ -111,6 +123,7 @@ public struct AppReducer {
               self.now.timeIntervalSinceReferenceDate
             )
           }
+          // 保存しているゲームを取得して.savedGamesLoadedでsavedGamesに値をセット
           await send(
             .savedGamesLoaded(
               Result { try await self.fileClient.loadSavedGames() }
@@ -119,6 +132,7 @@ public struct AppReducer {
           _ = try await migrate
         }
 
+      // Push通知がタップされた時
       case let .appDelegate(.userNotifications(.didReceiveResponse(response, completionHandler))):
         if let data =
           try? JSONSerialization
@@ -127,6 +141,7 @@ public struct AppReducer {
             .decode(PushNotificationContent.self, from: data)
         {
           switch pushNotificationContent {
+          // デイリーチャレンジ終了間近通知押下時にデイリーチャレンジがあればゲーム画面を表示
           case .dailyChallengeEndsSoon:
             if let inProgressGame = state.home.savedGames.dailyChallengeUnlimited {
               state.destination = .game(Game.State(inProgressGame: inProgressGame))
@@ -134,6 +149,7 @@ public struct AppReducer {
               // TODO: load/retry
             }
 
+          // デイリーチャレンジレポート通知の時は.dailyChallengeを表示
           case .dailyChallengeReport:
             state.destination = nil
             state.home.destination = .dailyChallenge(.init())
@@ -145,6 +161,7 @@ public struct AppReducer {
       case .appDelegate:
         return .none
 
+      // .bottomMenu: 下から出てくるゲームを終わらせるView
       case .destination(
         .presented(.game(.destination(.presented(.bottomMenu(.endGameButtonTapped)))))
       ),
@@ -169,6 +186,8 @@ public struct AppReducer {
         state.destination = .game(Game.State(inProgressGame: inProgressGame))
         return .none
 
+      // unlimitedで前回途中のゲームを開始ボタンを押下した時
+      // ゲーム画面にも上部のボタンを押下で前回途中のゲームを選択できる画面がある
       case .destination(.presented(.game(.activeGames(.soloTapped)))),
         .home(.activeGames(.soloTapped)):
         guard let inProgressGame = state.home.savedGames.unlimited
@@ -191,6 +210,9 @@ public struct AppReducer {
           } catch {}
         }
 
+      // ソロのtimeゲーム開始ボタン押下時
+      // ポイント稼がないとゲームオーバ画面でない
+      // ゲームオーバ画面にplay againがあってそこを押下でここのアクションに来る
       case .destination(
         .presented(.game(.destination(.presented(.gameOver(.delegate(.startSoloGame(.timed)))))))
       ),
@@ -264,6 +286,8 @@ public struct AppReducer {
             remoteNotifications: self.remoteNotifications,
             userNotifications: self.userNotifications
           )
+          // アプリデータを取得している....?
+          // UserDefaultsに保存もしている
           async let refresh = self.refreshServerConfig()
           _ = try await (register, refresh)
         } catch: { _, _ in

@@ -10,5 +10,7 @@ public func registerForRemoteNotificationsAsync(
   let settings = await userNotifications.getNotificationSettings()
   guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
   else { return }
+  // UIApplication.shared.registerForRemoteNotifications
+  // Pushトークン取得
   await remoteNotifications.register()
 }

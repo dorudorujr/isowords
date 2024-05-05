@@ -58,6 +58,7 @@ extension UserNotificationClient {
       self.continuation = continuation
     }
 
+    // Push通知がタップされた時
     func userNotificationCenter(
       _ center: UNUserNotificationCenter,
       didReceive response: UNNotificationResponse,
