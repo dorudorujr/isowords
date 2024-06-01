@@ -24,16 +24,21 @@ public struct ActiveMatchResponse: Equatable {
 public struct Home {
   @Reducer(state: .equatable)
   public enum Destination {
+    // キューブボタンを押したバージョン情報画面
     case changelog(ChangelogReducer)
     case dailyChallenge(DailyChallengeReducer)
+    // スコアボード画面
     case leaderboard(Leaderboard)
     case multiplayer(Multiplayer)
+    // 設定画面
     case settings(Settings)
+    // soloゲーム開始前画面
     case solo(Solo)
   }
 
   @ObservableState
   public struct State: Equatable {
+    // APIから取得するdailyChallenge情報
     public var dailyChallenges: [FetchTodaysDailyChallengeResponse]?
     @Presents public var destination: Destination.State?
     public var hasChangelog: Bool
@@ -141,6 +146,7 @@ public struct Home {
 
   private func core(state: inout State, action: Action) -> EffectOf<Self> {
     switch action {
+    // gameCenterから対戦データを取得した結果
     case let .activeMatchesResponse(.success(response)):
       state.hasPastTurnBasedGames = response.hasPastTurnBasedGames
       state.turnBasedMatches = response.matches
@@ -149,7 +155,10 @@ public struct Home {
     case .activeMatchesResponse(.failure):
       return .none
 
+    // turnBasedGame: 対戦かな....?
+    // 対戦終了(削除)
     case let .activeGames(.turnBasedGameMenuItemTapped(.deleteMatch(matchId))):
+      // .run: AsyncStreamなど繰り返しくるイベントをキャッチして処理(continuousClockなど)
       return .run { send in
         let localPlayer = self.gameCenter.localPlayer.localPlayer()
 
@@ -158,6 +167,7 @@ public struct Home {
           let currentParticipantIsLocalPlayer =
             match.currentParticipant?.player?.gamePlayerId == localPlayer.gamePlayerId
 
+          // currentParticipantIsLocalPlayer: 現在の参加者はLocalPlayer
           if currentParticipantIsLocalPlayer {
             try await self.gameCenter.turnBasedMatch
               .endMatchInTurn(
@@ -170,6 +180,7 @@ public struct Home {
                 )
               )
           } else {
+            // participantQuitOutOfTurn: 参加者が突然辞める
             try await self.gameCenter.turnBasedMatch
               .participantQuitOutOfTurn(match.matchId)
           }
@@ -205,6 +216,8 @@ public struct Home {
     case .activeGames:
       return .none
 
+    // 通知を取得した場合
+    // 本番環境接続時、Home画面の一番下にある白い通知View
     case let .authenticationResponse(currentPlayerEnvelope):
       let now = self.now.timeIntervalSinceReferenceDate
       let itsNagTime =
@@ -233,6 +246,7 @@ public struct Home {
       )
       return .none
 
+    // Homeの.taskで取りに行く
     case let .dailyChallengeResponse(.success(dailyChallenges)):
       state.dailyChallenges = dailyChallenges
       return .none
@@ -290,11 +304,14 @@ public struct Home {
     }
   }
 
+  // 通知、サーバー設定、デイリーチャレンジ、weekInReview、activeMatchesを取得
   private func authenticate(send: Send<Action>) async {
     do {
       try? await self.gameCenter.localPlayer.authenticate()
 
       let localPlayer = self.gameCenter.localPlayer.localPlayer()
+      // 通知を取得
+      // Home画面下にある白い帯
       let currentPlayerEnvelope = try await self.apiClient.authenticate(
         .init(
           deviceId: .init(rawValue: self.deviceId.id()),
@@ -490,6 +507,7 @@ public struct HomeView: View {
     ) { store in
       ChangelogView(store: store)
     }
+    // .finish: 完了するまで待機
     .task { await store.send(.task).finish() }
   }
 }

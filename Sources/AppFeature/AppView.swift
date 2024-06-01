@@ -66,6 +66,8 @@ public struct AppReducer {
 
   public var body: some ReducerOf<Self> {
     self.core
+      // moves: ゲームの情報(スコアとか開始時刻とか)
+      // .gameが生成されるタイミングでまず.movesが空で生成される
       .onChange(of: \.destination?.game?.moves) { _, moves in
         // .onChange: 指定した値が変更されたときにReduceが実行される
         Reduce { state, _ in
@@ -266,6 +268,7 @@ public struct AppReducer {
         return .none
 
       case let .home(.dailyChallengeResponse(.success(dailyChallenges))):
+        // 保存しているデイリーチャレンジが終わってたら削除してる?
         if dailyChallenges.unlimited?.dailyChallenge.id
           != state.home.savedGames.dailyChallengeUnlimited?.gameContext.dailyChallenge
         {
